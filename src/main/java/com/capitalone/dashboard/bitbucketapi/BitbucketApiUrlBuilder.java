@@ -42,7 +42,6 @@ public class BitbucketApiUrlBuilder {
     public URI buildReposApiUrl(String rawUrl) throws URISyntaxException {
         LOG.debug("bitbucket url :" + rawUrl);
         URIBuilder builder = new URIBuilder("");
-        String bitbucketproduct = settings.getProduct() != null ? settings.getProduct() : StringUtils.EMPTY;
         BitbucketUrlParser.BitbucketUrlParts urlParts = BitbucketUrlParser.parseBitbucketUrl(rawUrl);
         String apiPath = settings.getApi() != null ? settings.getApi() : StringUtils.EMPTY;
         if (apiPath.endsWith(FORWARD_SLASH)) {
@@ -52,25 +51,15 @@ public class BitbucketApiUrlBuilder {
         if (urlParts.getPort() != -1) {
             builder.setPort(urlParts.getPort());
         }
-        if(bitbucketproduct.equalsIgnoreCase("cloud")) {
-            builder.setPath(
-                    apiPath + FORWARD_SLASH + urlParts.getProjectKey() + FORWARD_SLASH + urlParts.getRepoKey());
-        }else {
-            builder.setPath(
-            		apiPath + "/projects/" + urlParts.getProjectKey() + "/repos/" + urlParts.getRepoKey());
-        }
+        builder.setPath(
+                apiPath + "/" + urlParts.getProjectKey() + "/" + urlParts.getRepoKey());
         return builder.build();
     }
 
     public URI buildPullRequestApiUrl(String rawUrl) throws URISyntaxException {
         URI uri = buildReposApiUrl(rawUrl);
         URIBuilder builder = new URIBuilder(uri);
-        String bitbucketproduct = settings.getProduct() != null ? settings.getProduct() : StringUtils.EMPTY;
-        if(bitbucketproduct.equalsIgnoreCase("cloud")) {
-            builder.setPath(builder.getPath() + "/pullrequests");
-        }else {
-            builder.setPath(builder.getPath() + "/pull-requests");
-        }
+        builder.setPath(builder.getPath() + "/pullrequests");
         return builder.build();
     }
 
@@ -78,12 +67,7 @@ public class BitbucketApiUrlBuilder {
             throws URISyntaxException {
         URI uri = buildReposApiUrl(rawUrl);
         URIBuilder builder = new URIBuilder(uri);
-        String bitbucketproduct = settings.getProduct() != null ? settings.getProduct() : StringUtils.EMPTY;
-        if(bitbucketproduct.equalsIgnoreCase("cloud")) {
-            builder.setPath(builder.getPath() + "/pullrequests/" + pullRequestId + "/activity");
-        }else {
-            builder.setPath(builder.getPath() + "/pull-requests/" + pullRequestId + "/activities");
-        }
+        builder.setPath(builder.getPath() + "/pullrequests/" + pullRequestId + "/activity");
         return builder.build();
     }
 }
