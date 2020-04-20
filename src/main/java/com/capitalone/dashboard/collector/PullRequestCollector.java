@@ -25,10 +25,7 @@ import java.net.URISyntaxException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -43,6 +40,9 @@ public class PullRequestCollector {
     private static final String OPEN = "open";
     private static final String CLOSED = "closed";
     private static final String MERGED = "merged";
+
+    DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSX");
+
 
     @Inject
     private GitSettings settings;
@@ -94,6 +94,7 @@ public class PullRequestCollector {
                     new URIBuilder(uri)
                             .addParameter("at", branchId)
                             .addParameter("state", status)
+                            .addParameter("limit", String.valueOf(settings.getPageSize()))
                             .build();
 
             boolean lastPage = false;
@@ -114,10 +115,16 @@ public class PullRequestCollector {
                 JSONArray values = (JSONArray) jsonArray.get("values");
                 for (Object item : values) {
                     JSONObject jsonObject = (JSONObject) item;
-                    Long updatedAt = (Long) jsonObject.get("updatedDate");
+                    Date updated_on = formatter.parse((String)jsonObject.get("updated_on"));
+                    Long updatedAt = updated_on.getTime();
 
+                    GitRequest pull = new GitRequest();
 
-                    GitRequest pull = getPullRequest(repo, jsonObject);
+                    if (settings.getProduct().equalsIgnoreCase("cloud")) {
+                        pull = getPullRequestCloud(repo, jsonObject);
+                    } else {
+                        pull = getPullRequestServer(repo, jsonObject);
+                    }
                     GitRequest existingPull =
                             gitRequestRepository.findByCollectorItemIdAndNumberAndRequestType(
                                     repo.getId(), pull.getNumber(), "pull");
@@ -179,7 +186,9 @@ public class PullRequestCollector {
                         bitbucketApiUrlBuilder.buildPullRequestActivitiesApiUrl(
                                 repo.getRepoUrl(), pull.getNumber());
                 pageUrl =
-                        new URIBuilder(uri).build();
+                        new URIBuilder(uri)
+                                .addParameter("limit", String.valueOf(settings.getPageSize()))
+                                .build();
                 boolean lastPage = false;
                 boolean stop = false;
                 URI queryUrlPage = pageUrl;
@@ -253,15 +262,46 @@ public class PullRequestCollector {
         }
     }
 
-    private GitRequest getPullRequest(
+    private GitRequest getPullRequestServer(
+            GitRepo repo, JSONObject jsonObject) {
+        String prNumber = jsonObject.get("id").toString();
+        String message = (String) jsonObject.get("title");
+        JSONObject fromRef = (JSONObject) jsonObject.get("fromRef");
+        String sha = (String) fromRef.get("latestCommit");
+        Long createdAt = (Long) jsonObject.get("createdDate");
+        Long updatedAt = (Long) jsonObject.get("updatedDate");
+        GitRequest pull = new GitRequest();
+        pull.setScmCommitLog(message);
+        pull.setNumber(prNumber);
+        pull.setScmUrl(repo.getRepoUrl());
+        pull.setScmRevisionNumber(sha);
+        long currentTimeMillis = new DateTime(createdAt).getMillis();
+        pull.setCreatedAt(currentTimeMillis);
+        pull.setTimestamp(currentTimeMillis);
+        pull.setUpdatedAt(new DateTime(updatedAt).getMillis());
+        pull.setUserId(getPullRequestAuthorServer(jsonObject));
+        pull.setRequestType(PULL);
+        pull.setScmBranch(repo.getBranch());
+
+        String state = (String) jsonObject.get("state");
+        if (StringUtils.equals("OPEN", state)) {
+            pull.setState(OPEN);
+        } else if (StringUtils.equals("DECLINED", state)) {
+            pull.setState(CLOSED);
+        } else if (StringUtils.equals("MERGED", state)) {
+            pull.setState(MERGED);
+        }
+
+        return pull;
+    }
+
+    private GitRequest getPullRequestCloud(
             GitRepo repo, JSONObject jsonObject) throws ParseException {
         String prNumber = jsonObject.get("id").toString();
         String message = (String) jsonObject.get("title");
         JSONObject source = (JSONObject) jsonObject.get("source");
         JSONObject commit = (JSONObject) source.get("commit");
         String sha = (String) commit.get("hash");
-
-        DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSX");
 
         Date created_on = formatter.parse((String)jsonObject.get("created_on"));
         Long createdAt = created_on.getTime();
@@ -278,7 +318,7 @@ public class PullRequestCollector {
         pull.setCreatedAt(currentTimeMillis);
         pull.setTimestamp(currentTimeMillis);
         pull.setUpdatedAt(new DateTime(updatedAt).getMillis());
-        pull.setUserId(getPullRequestAuthor(jsonObject));
+        pull.setUserId(getPullRequestAuthorCloud(jsonObject));
         pull.setRequestType(PULL);
         pull.setScmBranch(repo.getBranch());
 
@@ -294,7 +334,13 @@ public class PullRequestCollector {
         return pull;
     }
 
-    private String getPullRequestAuthor(JSONObject jsonObject) {
+    private String getPullRequestAuthorServer(JSONObject jsonObject) {
+        JSONObject author = (JSONObject) jsonObject.get("author");
+        JSONObject user = (JSONObject) author.get("user");
+        return user.get("name").toString();
+    }
+
+    private String getPullRequestAuthorCloud(JSONObject jsonObject) {
         JSONObject author = (JSONObject) jsonObject.get("author");
         return author.get("display_name").toString();
     }
