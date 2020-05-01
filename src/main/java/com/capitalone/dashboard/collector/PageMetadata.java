@@ -40,13 +40,11 @@ public class PageMetadata {
         if (CollectionUtils.isEmpty(this.values)) {
             this.lastPage = true;
         } else {
-            String isLastPage = str(this.jsonArray, "isLastPage");
-            this.lastPage = isLastPage == null || Boolean.valueOf(isLastPage);
-            String nextPageStart = str(this.jsonArray, "nextPageStart");
-            if (nextPageStart != null && !"null".equals(nextPageStart)) {
+            String nextPageUrlString = str(this.jsonArray, "next");
+            this.lastPage = nextPageUrlString == null;
+            if (nextPageUrlString != null && !"null".equals(nextPageUrlString)) {
                 try {
-                    this.nextPageUrl = new URIBuilder(this.currentPageUrl)
-                            .addParameter("start", nextPageStart).build();
+                    this.nextPageUrl = new URIBuilder(nextPageUrlString).build();
                 } catch (URISyntaxException e) {
                     throw new RuntimeException("Unable to create next page URI", e);
                 }

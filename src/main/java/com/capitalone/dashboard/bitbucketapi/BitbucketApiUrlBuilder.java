@@ -86,6 +86,30 @@ public class BitbucketApiUrlBuilder {
         }
         return builder.build();
     }
+
+    public URI buildPullRequestCommitsApiUrl(String rawUrl, String pullRequestId)
+            throws URISyntaxException {
+        URI uri = buildReposApiUrl(rawUrl);
+        URIBuilder builder = new URIBuilder(uri);
+        String bitbucketproduct = settings.getProduct() != null ? settings.getProduct() : StringUtils.EMPTY;
+        //Only configured for Bitbucket Cloud - May change for Bitbucket Server
+        if(bitbucketproduct.equalsIgnoreCase("cloud")) {
+            builder.setPath(builder.getPath() + "/pullrequests/" + pullRequestId + "/commits");
+        }
+        return builder.build();
+    }
+
+    public URI buildPullRequestCommentsApiUrl(String rawUrl, String pullRequestId)
+            throws URISyntaxException {
+        URI uri = buildReposApiUrl(rawUrl);
+        URIBuilder builder = new URIBuilder(uri);
+        String bitbucketproduct = settings.getProduct() != null ? settings.getProduct() : StringUtils.EMPTY;
+        //Only configured for Bitbucket Cloud - May change for Bitbucket Server
+        if(bitbucketproduct.equalsIgnoreCase("cloud")) {
+            builder.setPath(builder.getPath() + "/pullrequests/" + pullRequestId + "/comments");
+        }
+        return builder.build();
+    }
 }
 
 /*
